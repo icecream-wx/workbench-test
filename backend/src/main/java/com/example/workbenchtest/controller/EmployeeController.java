@@ -45,6 +45,11 @@ public class EmployeeController {
         return ApiResponse.ok(new EmployeePageResponse(items, result.getTotalElements()));
     }
 
+    @GetMapping("/stats")
+    public ApiResponse<EmployeeStatsResponse> stats() {
+        return ApiResponse.ok(EmployeeStatsResponse.from(employeeService.stats()));
+    }
+
     @GetMapping("/{id}")
     public ApiResponse<EmployeeResponse> detail(@PathVariable long id) {
         return ApiResponse.ok(EmployeeResponse.from(employeeService.get(id)));

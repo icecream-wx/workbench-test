@@ -18,11 +18,18 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 @Service
 public class EmployeeService {
 
     public static final int MAX_PAGE_SIZE = 100;
+
+    public static final String UNASSIGNED_DEPARTMENT = "未分配";
 
     private static final ZoneId ZONE = ZoneId.of("Asia/Shanghai");
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE;
@@ -43,6 +50,31 @@ public class EmployeeService {
             return employeeRepository.findAll(pageable);
         }
         return employeeRepository.searchByKeyword(condition, pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public EmployeeStats stats() {
+        Map<String, Long> counts = new LinkedHashMap<>();
+        for (EmployeeRepository.DepartmentCount row : employeeRepository.countByDepartment()) {
+            counts.merge(normalizeDepartment(row.getDepartment()), row.getTotal(), Long::sum);
+        }
+        List<EmployeeStats.DepartmentCount> departments = new ArrayList<>();
+        long total = 0L;
+        for (Map.Entry<String, Long> entry : counts.entrySet()) {
+            departments.add(new EmployeeStats.DepartmentCount(entry.getKey(), entry.getValue()));
+            total += entry.getValue();
+        }
+        departments.sort(Comparator
+                .comparingLong(EmployeeStats.DepartmentCount::count).reversed()
+                .thenComparing(EmployeeStats.DepartmentCount::department));
+        return new EmployeeStats(total, List.copyOf(departments));
+    }
+
+    private String normalizeDepartment(String department) {
+        if (department == null || department.trim().isEmpty()) {
+            return UNASSIGNED_DEPARTMENT;
+        }
+        return department;
     }
 
     @Transactional(readOnly = true)

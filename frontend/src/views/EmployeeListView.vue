@@ -12,6 +12,7 @@ import {
   ElOption,
   ElPagination,
   ElSelect,
+  ElSkeleton,
   ElTable,
   ElTableColumn,
 } from 'element-plus';
@@ -19,10 +20,12 @@ import type { FormInstance, FormRules } from 'element-plus';
 import PageHeader from '../components/PageHeader.vue';
 import {
   createEmployee,
+  getEmployeeStats,
   listEmployees,
   updateEmployee,
   type Employee,
   type EmployeePayload,
+  type EmployeeStats,
   type Gender,
 } from '../api/employees';
 
@@ -67,6 +70,11 @@ const total = ref(0);
 const items = ref<Employee[]>([]);
 const loading = ref(false);
 const loadError = ref<string | null>(null);
+
+const stats = ref<EmployeeStats | null>(null);
+const statsLoading = ref(false);
+const statsError = ref<string | null>(null);
+let statsRequestId = 0;
 
 const dialogVisible = ref(false);
 const dialogMode = ref<DialogMode>('create');
@@ -163,7 +171,7 @@ function applyServerError(message: string): void {
   }
 }
 
-async function load(): Promise<void> {
+async function load(options: { refreshStats?: boolean } = {}): Promise<void> {
   loading.value = true;
   loadError.value = null;
   try {
@@ -174,6 +182,9 @@ async function load(): Promise<void> {
     });
     items.value = result.items;
     total.value = result.total;
+    if (options.refreshStats !== false) {
+      void loadStats();
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : '加载员工列表失败';
     loadError.value = message;
@@ -182,6 +193,34 @@ async function load(): Promise<void> {
     ElMessage.error(message);
   } finally {
     loading.value = false;
+  }
+}
+
+async function loadStats(): Promise<void> {
+  const requestId = ++statsRequestId;
+  statsLoading.value = true;
+  statsError.value = null;
+  try {
+    const result = await getEmployeeStats();
+    if (requestId !== statsRequestId) {
+      return;
+    }
+    stats.value = {
+      total: result.total ?? 0,
+      departments: Array.isArray(result.departments) ? result.departments : [],
+    };
+  } catch (error) {
+    if (requestId !== statsRequestId) {
+      return;
+    }
+    stats.value = null;
+    const message = error instanceof Error ? error.message : '加载员工统计失败';
+    statsError.value = message;
+    ElMessage.error(message);
+  } finally {
+    if (requestId === statsRequestId) {
+      statsLoading.value = false;
+    }
   }
 }
 
@@ -287,7 +326,8 @@ async function submit(): Promise<void> {
 }
 
 onMounted(() => {
-  void load();
+  void load({ refreshStats: false });
+  void loadStats();
 });
 </script>
 
@@ -298,6 +338,35 @@ onMounted(() => {
         <ElButton @click="router.push({ name: 'home' })">返回首页</ElButton>
       </template>
     </PageHeader>
+
+    <section class="card stats-panel">
+      <div v-if="statsLoading" class="stats-state" data-testid="stats-loading">
+        <ElSkeleton :rows="1" animated />
+      </div>
+      <div v-else-if="statsError" class="stats-state">
+        <p class="error">{{ statsError }}</p>
+        <ElButton size="small" @click="loadStats">重试</ElButton>
+      </div>
+      <template v-else>
+        <div class="stats-grid">
+          <div class="stat-card stat-total">
+            <span class="stat-label">员工总数</span>
+            <span class="stat-value">{{ stats?.total ?? 0 }}</span>
+          </div>
+          <div
+            v-for="item in stats?.departments ?? []"
+            :key="item.department"
+            class="stat-card"
+          >
+            <span class="stat-label">{{ item.department }}</span>
+            <span class="stat-value">{{ item.count }}</span>
+          </div>
+        </div>
+        <p v-if="(stats?.departments?.length ?? 0) === 0" class="muted stats-empty">
+          暂无部门统计数据
+        </p>
+      </template>
+    </section>
 
     <section class="card">
       <div class="toolbar">
@@ -316,7 +385,7 @@ onMounted(() => {
 
       <div v-if="loadError" class="load-error">
         <p class="error">{{ loadError }}</p>
-        <ElButton @click="load">重试</ElButton>
+        <ElButton @click="load()">重试</ElButton>
       </div>
       <template v-else>
         <ElTable
@@ -455,6 +524,60 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.stats-panel {
+  margin-bottom: 20px;
+}
+
+.stats-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.stat-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 128px;
+  padding: 14px 18px;
+  border: 1px solid var(--app-border);
+  border-radius: 12px;
+  background: var(--app-bg);
+}
+
+.stat-total {
+  background: var(--app-surface);
+  border-color: var(--app-primary);
+}
+
+.stat-label {
+  color: var(--app-muted);
+  font-size: 13px;
+  word-break: break-all;
+}
+
+.stat-value {
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.stats-state {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+}
+
+.stats-state p {
+  margin: 0;
+}
+
+.stats-empty {
+  margin: 12px 0 0;
+  font-size: 13px;
+}
+
 .toolbar {
   display: flex;
   flex-wrap: wrap;

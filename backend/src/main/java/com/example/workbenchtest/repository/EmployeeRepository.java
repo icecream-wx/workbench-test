@@ -7,6 +7,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
+
 public interface EmployeeRepository extends JpaRepository<Employee, Long> {
 
     boolean existsByEmployeeNoIgnoreCase(String employeeNo);
@@ -19,4 +21,18 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
                or lower(e.name) like lower(concat('%', :keyword, '%'))
             """)
     Page<Employee> searchByKeyword(@Param("keyword") String keyword, Pageable pageable);
+
+    @Query("""
+            select e.department as department, count(e) as total
+            from Employee e
+            group by e.department
+            """)
+    List<DepartmentCount> countByDepartment();
+
+    interface DepartmentCount {
+
+        String getDepartment();
+
+        long getTotal();
+    }
 }

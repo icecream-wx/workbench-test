@@ -34,8 +34,22 @@ export interface EmployeeQuery {
   keyword?: string;
 }
 
+export interface EmployeeDepartmentStat {
+  department: string;
+  count: number;
+}
+
+export interface EmployeeStats {
+  total: number;
+  departments: EmployeeDepartmentStat[];
+}
+
 export function listEmployees(query: EmployeeQuery): Promise<PageResult<Employee>> {
   return get<PageResult<Employee>>('/employees', { params: query });
+}
+
+export function getEmployeeStats(): Promise<EmployeeStats> {
+  return get<EmployeeStats>('/employees/stats');
 }
 
 export function getEmployee(id: number): Promise<Employee> {
