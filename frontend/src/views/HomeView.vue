@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted } from 'vue';
+import { useRouter } from 'vue-router';
 import { ElButton, ElTag } from 'element-plus';
 import PageHeader from '../components/PageHeader.vue';
 import { fetchHealth } from '../api/health';
@@ -7,6 +8,7 @@ import { useAsync } from '../composables/useAsync';
 import { useAppStore } from '../stores/app';
 
 const app = useAppStore();
+const router = useRouter();
 const { loading, error, data: health, run } = useAsync(fetchHealth);
 
 async function reload(): Promise<void> {
@@ -21,7 +23,11 @@ onMounted(() => {
 
 <template>
   <main class="page">
-    <PageHeader :title="app.appName" subtitle="后端骨架已就绪，业务页面由 Agent 增量编写。" />
+    <PageHeader :title="app.appName" subtitle="后端骨架已就绪，业务页面由 Agent 增量编写。">
+      <template #actions>
+        <ElButton type="primary" @click="router.push({ name: 'employees' })">员工管理</ElButton>
+      </template>
+    </PageHeader>
 
     <section class="card">
       <div class="row">

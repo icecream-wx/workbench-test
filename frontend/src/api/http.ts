@@ -16,7 +16,9 @@ http.interceptors.response.use(
   (error: unknown) => {
     if (axios.isAxiosError(error)) {
       const message = (error.response?.data as { message?: string } | undefined)?.message;
-      return Promise.reject(new Error(message || error.message || '网络请求失败'));
+      const status = error.response?.status;
+      const fallback = status ? `请求失败（HTTP ${status}）` : '网络请求失败，请检查网络或后端服务';
+      return Promise.reject(new Error(message || fallback));
     }
     return Promise.reject(error instanceof Error ? error : new Error('网络请求失败'));
   },
